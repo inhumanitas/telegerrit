@@ -2,12 +2,10 @@
 import telebot
 from telebot import types
 
-import settings
-from bot.setup.handlers import settings_list
+from telegerrit import settings
+from telegerrit.telegram.setup import settings_list
 
-bot = telebot.TeleBot(settings.token)
-
-setup_cmd = 'setup'
+bot = telebot.TeleBot(settings.bot_father_token)
 
 
 def next_step_wrapper(fn):
@@ -24,7 +22,6 @@ def process_step(message):
     setting = message.text
     for setting_obj in settings_list:
         if setting == setting_obj.name:
-            print len(setting_obj.keyboard_options)
             if setting_obj.keyboard_options:
                 markup = types.ReplyKeyboardMarkup(one_time_keyboard=True,
                                                    selective=True)
@@ -40,7 +37,7 @@ def process_step(message):
                 msg, next_step_wrapper(setting_obj.next_step))
 
 
-@bot.message_handler(commands=[setup_cmd])
+@bot.message_handler(commands=['setup'])
 def setup_command(message):
     """
     Configure params for bot
@@ -61,4 +58,5 @@ def setup_command(message):
 
 
 if __name__ == '__main__':
-    bot.polling(none_stop=True)
+    print 'Starting bot'
+    bot.polling()

@@ -1,4 +1,6 @@
 
+from telegerrit.gerrit.models import CommentsWriter
+
 
 class Option(object):
     """
@@ -13,6 +15,9 @@ class Option(object):
 
         self.title = title
         self.value = value or title
+
+    def __cmp__(self, other):
+        return self.value == other
 
 
 class Setting(object):
@@ -57,21 +62,20 @@ class Setting(object):
     def save_results(self, message):
         return self.callback(message)
 
-
-def new_change_saver(args):
-    print 'new_change_saver', args
-    return True
+option_enable = Option('Enable')
+option_disable = Option('Disable')
 
 
-def new_change_saver2(args):
-    print 'new_change_saver2', args
-    return True
+def notify_comment_saver(message):
+    is_notified = 1 if message.text == option_enable else 0
+    chat_id = message.chat.id
+    return CommentsWriter.save(chat_id, is_notified)
 
 
 settings_list = [
-    Setting('Notify about new change', new_change_saver,
-            Option('Enable'), Option('Disable')),
-    Setting('Notify about comments for change', new_change_saver2,
-            Option('Enable2'), Option('Disable2'), Option('Various')),
-    Setting('Set gerrit username', new_change_saver2),
+    # Setting('Notify about new change', new_change_saver,
+    #         option_enable, ),
+    Setting('Notify about new comments for changes', notify_comment_saver,
+            option_enable, option_disable),
+    # Setting('Set gerrit username', new_change_saver2),
 ]
