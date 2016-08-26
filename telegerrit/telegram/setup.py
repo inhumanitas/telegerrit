@@ -1,5 +1,5 @@
 
-from telegerrit.gerrit.models import CommentsWriter
+from telegerrit.gerrit.models import CommentsWriter, UserMap
 
 
 class Option(object):
@@ -72,10 +72,15 @@ def notify_comment_saver(message):
     return CommentsWriter.save(chat_id, is_notified)
 
 
+def username_saver(message):
+    chat_id = message.chat.id
+    return UserMap.save(chat_id, message.text)
+
+
 settings_list = [
     # Setting('Notify about new change', new_change_saver,
     #         option_enable, ),
     Setting('Notify about new comments for changes', notify_comment_saver,
             option_enable, option_disable),
-    # Setting('Set gerrit username', new_change_saver2),
+    Setting('Set gerrit username', username_saver),
 ]

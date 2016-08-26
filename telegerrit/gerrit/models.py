@@ -115,3 +115,28 @@ class CommentsWriter(SettingsWriter):
     @classmethod
     def get(cls, chat_id):
         return super(CommentsWriter, cls).get(chat_id=chat_id)
+
+
+class UserMap(SettingsWriter):
+    """Manager for setting map gerrit username to telegram user id"""
+
+    table_name = 'UserMap'
+    columns = {
+        'chat_id': 'INTEGER',
+        'gerrit_username': 'INTEGER',
+    }
+    # TODO uniq by all cols
+
+    @classmethod
+    def save(cls, chat_id, gerrit_username):
+        return super(UserMap, cls).save(
+            chat_id=chat_id, gerrit_username=gerrit_username)
+
+    @classmethod
+    def get_by_gerrit_username(cls, username):
+        try:
+            data = super(UserMap, cls).get(gerrit_username=username)
+        except WritersException:
+            data = None
+        if data:
+            return data[1]

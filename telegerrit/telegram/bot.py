@@ -56,6 +56,10 @@ def setup_command(message):
 # def all_messages(message):
 #     bot.send_message(message.chat.id, message.text.strip('/'))
 
+def send_message(user_id, message):
+    msg = message or u'Wrong message format'
+    bot.send_message(user_id, msg)
+
 
 if __name__ == '__main__':
     print 'Starting bot'

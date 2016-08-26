@@ -24,8 +24,12 @@
 # for review in query.filter(comment, other):
 # # for review in query.filter(project, other):
 #     print review
+import sys
 from pygerrit.client import GerritClient
 from pygerrit.events import CommentAddedEvent
+
+from telegerrit.gerrit.models import UserMap, CommentsWriter
+from telegerrit.telegram.bot import send_message
 
 
 class GerritClientEventStream(GerritClient):
@@ -40,6 +44,8 @@ class GerritClientEventStream(GerritClient):
         return
 
     def __enter__(self):
+        # Needed to make event stream to be connected to server
+        self.client.gerrit_version()
         self.client.start_event_stream()
         return self.client
 
@@ -47,35 +53,39 @@ class GerritClientEventStream(GerritClient):
         self.client.stop_event_stream()
 
 
-def main(*args, **kwars):
-    with GerritClientEventStream(*args, **kwars) as client:
-        while True:
-            print client.get_event()
-
-
 class EventHandler(object):
-    def run(self, event):
+    @classmethod
+    def run(cls, event):
         raise NotImplemented()
 
 
 class CommentAddedEventHandler(EventHandler):
-    def run(self, event):
-        pass
+    @classmethod
+    def run(cls, event):
+        # take telegram user by gerrit username event.author.username
+        chat_id = UserMap.get_by_gerrit_username(event.author.username)
+        # send message if subscribed
+        if chat_id and CommentsWriter.get(chat_id):
+            msg = u'; '.join([unicode(event.change),
+                              event.author.name,
+                              event.comment])
+            send_message(chat_id, msg)
+
 
 events = {
     CommentAddedEvent: CommentAddedEventHandler,
 }
 
 
-if __name__ == '__main__':
-    # main('review')
-    cli = GerritClient('review')
-    cli.start_event_stream()
-    while True:
-        event = cli.get_event()
-        event_handler = events.get(event.__class__)
-        if event_handler:
-            assert issubclass(event_handler.__class__, EventHandler)
-            event_handler(event)
+def main(*args, **kwars):
+    with GerritClientEventStream(*args, **kwars) as client:
+        while True:
+            event = client.get_event()
+            event_handler = events.get(event.__class__)
+            if event_handler:
+                assert issubclass(event_handler, EventHandler)
+                event_handler.run(event)
 
-    cli.stop_event_stream()
+
+if __name__ == '__main__':
+    sys.exit(main('review'))
