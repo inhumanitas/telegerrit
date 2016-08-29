@@ -74,7 +74,7 @@ def notify_comment_saver(message):
 
 def username_saver(message):
     chat_id = message.chat.id
-    return UserMap.save(chat_id, message.text)
+    return UserMap.save(chat_id=chat_id, gerrit_username=message.text)
 
 
 settings_list = [

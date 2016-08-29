@@ -1,9 +1,14 @@
+import logging
 import os
 
 import sqlite3
-from sqlalchemy.exc import OperationalError
 
+
+from collections import OrderedDict
 from telegerrit import settings
+
+
+logger = logging.getLogger(__name__)
 
 
 class WritersException(Exception):
@@ -18,7 +23,7 @@ class SettingsWriter(object):
     columns = None
 
     @classmethod
-    def prepared(cls):
+    def __prepared(cls):
         # Connecting to the database file
         db_path = os.path.dirname(cls.db_path)
         if not os.path.exists(db_path):
@@ -29,7 +34,7 @@ class SettingsWriter(object):
                 pass
         try:
             cls._conn = conn = sqlite3.connect(cls.db_path)
-        except OperationalError:
+        except sqlite3.OperationalError:
             return False
 
         c = conn.cursor()
@@ -39,8 +44,8 @@ class SettingsWriter(object):
         # Creating a new SQLite table with 1 column
         try:
             c.execute(sql)
-        except OperationalError:
-            pass
+        except sqlite3.OperationalError as e:
+            logger.critical(e)
 
         conn.commit()
 
@@ -48,7 +53,7 @@ class SettingsWriter(object):
 
     @classmethod
     def __exec_sql(cls, sql):
-        if not cls.prepared():
+        if not cls.__prepared():
             raise WritersException("Could not access to DB")
 
         try:
@@ -78,7 +83,18 @@ class SettingsWriter(object):
     def get(cls, **data):
 
         query = ' AND '.join(
-            [unicode(k) + '=' + unicode(v) for k, v in data.items()])
+            [unicode(k) + '="' + unicode(v)+'"' for k, v in data.items()])
+
+        sql = "SELECT * FROM {table_name} WHERE {query}".format(
+            table_name=cls.table_name, query=query)
+
+        return cls.__exec_sql(sql).fetchone()
+
+    @classmethod
+    def get_many(cls, **data):
+
+        query = ' AND '.join(
+            [unicode(k) + '="' + unicode(v)+'"' for k, v in data.items()])
 
         sql = "SELECT * FROM {table_name} WHERE {query}".format(
             table_name=cls.table_name, query=query)
@@ -102,35 +118,27 @@ class CommentsWriter(SettingsWriter):
     """Manager for setting for comment"""
 
     table_name = 'Comments'
-    columns = {
+    columns = OrderedDict({
         'chat_id': 'INTEGER',
         'is_notified': 'INTEGER',
-    }
+    })
+    # TODO unique by chat_id
 
     @classmethod
     def save(cls, chat_id, is_notified):
         return super(CommentsWriter, cls).save(
             chat_id=chat_id, is_notified=is_notified)
 
-    @classmethod
-    def get(cls, chat_id):
-        return super(CommentsWriter, cls).get(chat_id=chat_id)
-
 
 class UserMap(SettingsWriter):
     """Manager for setting map gerrit username to telegram user id"""
 
     table_name = 'UserMap'
-    columns = {
+    columns = OrderedDict({
         'chat_id': 'INTEGER',
         'gerrit_username': 'INTEGER',
-    }
+    })
     # TODO uniq by all cols
-
-    @classmethod
-    def save(cls, chat_id, gerrit_username):
-        return super(UserMap, cls).save(
-            chat_id=chat_id, gerrit_username=gerrit_username)
 
     @classmethod
     def get_by_gerrit_username(cls, username):
