@@ -25,13 +25,15 @@ class Setting(object):
     Aggregator for options
     """
 
-    def __init__(self, name, callback, *options):
+    def __init__(self, name, callback, asking_text='Enter value',
+                 options=None):
         super(Setting, self).__init__()
         assert callable(callback)
 
         self.name = name
         self.callback = callback
-        self.__options = options
+        self.text = asking_text
+        self.__options = options or []
 
     def __unicode__(self):
         return self.name
@@ -74,13 +76,13 @@ def notify_comment_saver(message):
 
 def username_saver(message):
     chat_id = message.chat.id
-    return UserMap.save(chat_id, message.text)
+    return UserMap.set(chat_id=chat_id, gerrit_username=message.text)
 
 
 settings_list = [
+    Setting('Set gerrit username', username_saver, 'Enter gerrit username'),
+    Setting('Notify about new comments for changes', notify_comment_saver,
+            options=(option_enable, option_disable)),
     # Setting('Notify about new change', new_change_saver,
     #         option_enable, ),
-    Setting('Notify about new comments for changes', notify_comment_saver,
-            option_enable, option_disable),
-    Setting('Set gerrit username', username_saver),
 ]

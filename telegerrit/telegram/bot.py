@@ -19,19 +19,19 @@ def next_step_wrapper(fn):
 
 
 def process_step(message):
-    setting = message.text
+    setting_name = message.text
     for setting_obj in settings_list:
-        if setting == setting_obj.name:
+        if setting_name == setting_obj.name:
             if setting_obj.keyboard_options:
                 markup = types.ReplyKeyboardMarkup(one_time_keyboard=True,
                                                    selective=True)
                 markup.row(*setting_obj.keyboard_options)
 
                 msg = bot.send_message(message.chat.id,
-                                       "Select one of param editing:",
+                                       setting_obj.text,
                                        reply_markup=markup)
             else:
-                msg = bot.send_message(message.chat.id, "Enter value:")
+                msg = bot.send_message(message.chat.id, setting_obj.text)
 
             bot.register_next_step_handler(
                 msg, next_step_wrapper(setting_obj.next_step))

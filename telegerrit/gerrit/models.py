@@ -1,6 +1,8 @@
 import os
 
 import sqlite3
+from collections import OrderedDict
+
 from sqlalchemy.exc import OperationalError
 
 from telegerrit import settings
@@ -16,6 +18,10 @@ class SettingsWriter(object):
     _conn = None
     table_name = None  # name of the table to be created
     columns = None
+
+    @classmethod
+    def from_row(cls, row):
+        return dict(zip(cls.columns, row))
 
     @classmethod
     def prepared(cls):
@@ -75,15 +81,22 @@ class SettingsWriter(object):
         return cls.__write_entry(**data)
 
     @classmethod
-    def get(cls, **data):
-
+    def retrieve(cls, **data):
         query = ' AND '.join(
-            [unicode(k) + '=' + unicode(v) for k, v in data.items()])
+            [unicode(k) + '="' + unicode(v)+'"' for k, v in data.items()])
 
         sql = "SELECT * FROM {table_name} WHERE {query}".format(
             table_name=cls.table_name, query=query)
 
-        return cls.__exec_sql(sql).fetchall()
+        return cls.__exec_sql(sql)
+
+    @classmethod
+    def get_one(cls, **data):
+        return cls.retrieve(**data).fetchone()
+
+    @classmethod
+    def get_many(cls, **data):
+        return cls.retrieve(**data).fetchall()
 
     @classmethod
     def update(cls, values, **query):
@@ -97,46 +110,56 @@ class SettingsWriter(object):
 
         return cls.__exec_sql(sql).fetchall()
 
+    @classmethod
+    def delete(cls, **params):
+        q = ' AND '.join(
+            [unicode(k)+'="'+unicode(v)+'"' for k, v in params.items()])
+
+        sql = "DELETE FROM {table_name} WHERE {query}".format(
+            table_name=cls.table_name, query=q)
+        return cls.__exec_sql(sql)
+
 
 class CommentsWriter(SettingsWriter):
     """Manager for setting for comment"""
 
     table_name = 'Comments'
-    columns = {
+    columns = OrderedDict({
         'chat_id': 'INTEGER',
         'is_notified': 'INTEGER',
-    }
+    })
 
     @classmethod
     def save(cls, chat_id, is_notified):
         return super(CommentsWriter, cls).save(
             chat_id=chat_id, is_notified=is_notified)
 
-    @classmethod
-    def get(cls, chat_id):
-        return super(CommentsWriter, cls).get(chat_id=chat_id)
-
 
 class UserMap(SettingsWriter):
     """Manager for setting map gerrit username to telegram user id"""
 
     table_name = 'UserMap'
-    columns = {
+    # TODO uniq by all cols
+    columns = OrderedDict({
         'chat_id': 'INTEGER',
         'gerrit_username': 'INTEGER',
-    }
-    # TODO uniq by all cols
-
-    @classmethod
-    def save(cls, chat_id, gerrit_username):
-        return super(UserMap, cls).save(
-            chat_id=chat_id, gerrit_username=gerrit_username)
+    })
 
     @classmethod
     def get_by_gerrit_username(cls, username):
         try:
-            data = super(UserMap, cls).get(gerrit_username=username)
+            data = super(UserMap, cls).get_one(gerrit_username=username)
         except WritersException:
             data = None
-        if data:
+        else:
             return data[1]
+
+    @classmethod
+    def set(cls, **data):
+        rows = cls.get_many(chat_id=data.get('chat_id'))
+        for row in rows:
+            param = cls.from_row(row)
+            param.pop('gerrit_username')
+            cls.delete(**param)
+
+        return cls.save(**data)

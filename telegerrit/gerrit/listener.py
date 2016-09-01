@@ -65,7 +65,7 @@ class CommentAddedEventHandler(EventHandler):
         # take telegram user by gerrit username event.author.username
         chat_id = UserMap.get_by_gerrit_username(event.author.username)
         # send message if subscribed
-        if chat_id and CommentsWriter.get(chat_id):
+        if chat_id and CommentsWriter.get_one(chat_id=chat_id):
             msg = u'; '.join([unicode(event.change),
                               event.author.name,
                               event.comment])
