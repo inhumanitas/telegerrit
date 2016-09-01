@@ -1,11 +1,15 @@
+import logging
 import os
-
 import sqlite3
+
 from collections import OrderedDict
 
 from sqlalchemy.exc import OperationalError
 
 from telegerrit import settings
+
+
+logger = logging.getLogger(__name__)
 
 
 class WritersException(Exception):
@@ -24,7 +28,7 @@ class SettingsWriter(object):
         return dict(zip(cls.columns, row))
 
     @classmethod
-    def prepared(cls):
+    def __prepared(cls):
         # Connecting to the database file
         db_path = os.path.dirname(cls.db_path)
         if not os.path.exists(db_path):
@@ -35,7 +39,7 @@ class SettingsWriter(object):
                 pass
         try:
             cls._conn = conn = sqlite3.connect(cls.db_path)
-        except OperationalError:
+        except sqlite3.OperationalError:
             return False
 
         c = conn.cursor()
@@ -45,8 +49,8 @@ class SettingsWriter(object):
         # Creating a new SQLite table with 1 column
         try:
             c.execute(sql)
-        except OperationalError:
-            pass
+        except sqlite3.OperationalError as e:
+            logger.critical(e)
 
         conn.commit()
 
@@ -54,7 +58,7 @@ class SettingsWriter(object):
 
     @classmethod
     def __exec_sql(cls, sql):
-        if not cls.prepared():
+        if not cls.__prepared():
             raise WritersException("Could not access to DB")
 
         try:
@@ -124,6 +128,7 @@ class CommentsWriter(SettingsWriter):
     """Manager for setting for comment"""
 
     table_name = 'Comments'
+    # TODO unique by chat_id
     columns = OrderedDict({
         'chat_id': 'INTEGER',
         'is_notified': 'INTEGER',

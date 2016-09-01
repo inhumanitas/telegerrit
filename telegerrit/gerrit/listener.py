@@ -1,29 +1,4 @@
-# from gerrit import filters
-# from gerrit import reviews
-#
-# # gerrit_host = 'http://10.10.31.147/'
-# gerrit_host = '10.10.31.147'
-#
-# project = filters.OrFilter()
-# # project.add_items('project', ['tionix-client', 'tionix-dash'])
-#
-# change = filters.AndFilter()
-# change.add_items('change', [2389])
-#
-# comment = filters.AndFilter()
-# comment.add_items('comment', [1])
-#
-#
-# other = filters.Items()
-# other.add_items('is', 'open')
-# other.add_items('limit', 100)
-#
-# query = reviews.Query(host=gerrit_host, user='d.valiullin',
-#                       # key='C:\ssh-key\id_rsa.pub')
-#                       key='C:\Users\user\.ssh\id_rsa.pub')
-# for review in query.filter(comment, other):
-# # for review in query.filter(project, other):
-#     print review
+
 import sys
 from pygerrit.client import GerritClient
 from pygerrit.events import CommentAddedEvent

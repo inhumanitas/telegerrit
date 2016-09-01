@@ -1,2 +1,2 @@
 pygerrit
-telebot
+pyTelegramBotAPI
