@@ -52,7 +52,7 @@ class CommentAddedEventHandler(EventHandler):
                 msg = u';\n'.join([
                     event.comment,
                     event.change.owner.name+unicode(event.change),
-                    gerrit_url_template.format(chage_id=event.change.number),
+                    gerrit_url_template.format(change_id=event.change.number),
                     event.author.name
                 ])
                 logger.info(msg)
