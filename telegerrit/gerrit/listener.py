@@ -1,10 +1,15 @@
-
+import logging
 import sys
+
 from pygerrit.client import GerritClient
 from pygerrit.events import CommentAddedEvent
 
 from telegerrit.gerrit.models import UserMap, CommentsWriter
+from telegerrit.settings import ssh_config, gerrit_url_template
 from telegerrit.telegram.bot import send_message
+
+
+logger = logging.getLogger(__name__)
 
 
 class GerritClientEventStream(GerritClient):
@@ -37,14 +42,21 @@ class EventHandler(object):
 class CommentAddedEventHandler(EventHandler):
     @classmethod
     def run(cls, event):
-        # take telegram user by gerrit username event.author.username
-        chat_id = UserMap.get_by_gerrit_username(event.author.username)
         # send message if subscribed
-        if chat_id and CommentsWriter.get(chat_id):
-            msg = u'; '.join([unicode(event.change),
-                              event.author.name,
-                              event.comment])
-            send_message(chat_id, msg)
+        if (event.author.name == u'Jenkins' and
+                event.comment == u'Patch Set 1: Verified+1'):
+            return
+
+        for chat_id in UserMap.get_user_ids():
+            if CommentsWriter.is_notified(chat_id=chat_id):
+                msg = u';\n'.join([
+                    event.comment,
+                    event.change.owner.name+unicode(event.change),
+                    gerrit_url_template.format(chage_id=event.change.number),
+                    event.author.name
+                ])
+                logger.info(msg)
+                send_message(chat_id, msg)
 
 
 events = {
@@ -63,4 +75,4 @@ def main(*args, **kwars):
 
 
 if __name__ == '__main__':
-    sys.exit(main('review'))
+    sys.exit(main(ssh_config))

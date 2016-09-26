@@ -11,6 +11,8 @@ from telegerrit import settings
 logger = logging.getLogger(__name__)
 
 
+# TODO Refactor to ORM usage
+
 class WritersException(Exception):
     pass
 
@@ -38,8 +40,8 @@ class SettingsWriter(object):
             return False
 
         c = conn.cursor()
-        cols = ','.join(map(lambda x: x[0] + ' ' + x[1], cls.columns.items()))
-        sql = 'CREATE TABLE IF NOT EXISTS {tn} ({cols})'.format(
+        cols = u','.join(map(lambda x: x[0] + u' ' + x[1], cls.columns.items()))
+        sql = u'CREATE TABLE IF NOT EXISTS {tn} ({cols})'.format(
             tn=cls.table_name, cols=cols)
         # Creating a new SQLite table with 1 column
         try:
@@ -67,10 +69,10 @@ class SettingsWriter(object):
     @classmethod
     def __write_entry(cls, **data):
 
-        columns = ','.join(cls.columns.keys())
-        values = ','.join(['"' + unicode(v) + '"' for v in data.values()])
+        columns = u','.join(cls.columns.keys())
+        values = u','.join([u'"' + unicode(v) + u'"' for v in data.values()])
 
-        sql = "INSERT INTO {table_name} ({cols}) VALUES ({values})".format(
+        sql = u"INSERT INTO {table_name} ({cols}) VALUES ({values})".format(
             table_name=cls.table_name, cols=columns, values=values)
 
         return cls.__exec_sql(sql)
@@ -82,10 +84,10 @@ class SettingsWriter(object):
     @classmethod
     def get(cls, **data):
 
-        query = ' AND '.join(
-            [unicode(k) + '="' + unicode(v)+'"' for k, v in data.items()])
+        query = u' AND '.join(
+            [unicode(k) + u'="' + unicode(v)+u'"' for k, v in data.items()])
 
-        sql = "SELECT * FROM {table_name} WHERE {query}".format(
+        sql = u"SELECT * FROM {table_name} WHERE {query}".format(
             table_name=cls.table_name, query=query)
 
         return cls.__exec_sql(sql).fetchone()
@@ -93,24 +95,34 @@ class SettingsWriter(object):
     @classmethod
     def get_many(cls, **data):
 
-        query = ' AND '.join(
-            [unicode(k) + '="' + unicode(v)+'"' for k, v in data.items()])
-
-        sql = "SELECT * FROM {table_name} WHERE {query}".format(
-            table_name=cls.table_name, query=query)
-
+        query = u' AND '.join(
+            [unicode(k) + u'="' + unicode(v) + u'"' for k, v in data.items()])
+        if query:
+            sql = u"SELECT * FROM {table_name} WHERE {query}".format(
+                table_name=cls.table_name, query=query)
+        else:
+            return cls.get_all()
         return cls.__exec_sql(sql).fetchall()
 
     @classmethod
     def update(cls, values, **query):
-        q = ' AND '.join(
-            [unicode(k) + '=' + unicode(v) for k, v in query.items()])
-        values = ','.join(
-            [unicode(k)+'='+unicode(v) for k, v in values.items()])
+        q = u' AND '.join(
+            [unicode(k) + u'=' + unicode(v) for k, v in query.items()])
+        values = u','.join(
+            [unicode(k) + u'= "'+unicode(v) + u'"' for k, v in values.items()])
+        if q:
+            sql = u"UPDATE {table_name} SET {values} WHERE {query}".format(
+                table_name=cls.table_name, values=values, query=q)
+        else:
+            sql = u"UPDATE {table_name} SET {values}".format(
+                table_name=cls.table_name, values=values)
 
-        sql = "UPDATE {table_name} SET {values} WHERE {query}".format(
-            table_name=cls.table_name, values=values, query=q)
+        return cls.__exec_sql(sql).fetchall()
 
+    @classmethod
+    def get_all(cls):
+        sql = u"SELECT * FROM {table_name}".format(
+                table_name=cls.table_name)
         return cls.__exec_sql(sql).fetchall()
 
 
@@ -126,8 +138,22 @@ class CommentsWriter(SettingsWriter):
 
     @classmethod
     def save(cls, chat_id, is_notified):
-        return super(CommentsWriter, cls).save(
-            chat_id=chat_id, is_notified=is_notified)
+        query = {'chat_id': chat_id}
+
+        if CommentsWriter.get(**query):
+            CommentsWriter.update(values={'is_notified': is_notified},
+                                  **query)
+        else:
+            super(CommentsWriter, cls).save(**query)
+
+        return True
+
+    @classmethod
+    def is_notified(cls, chat_id):
+        row = CommentsWriter.get(chat_id=chat_id)
+        is_notified, chat_id = row if row else ('False', 0)
+        is_notified = is_notified == 'True'
+        return is_notified
 
 
 class UserMap(SettingsWriter):
@@ -138,13 +164,34 @@ class UserMap(SettingsWriter):
         'chat_id': 'INTEGER',
         'gerrit_username': 'INTEGER',
     })
+
     # TODO uniq by all cols
 
     @classmethod
+    def save(cls, **data):
+        query = {'chat_id': data['chat_id']}
+
+        if UserMap.get(**query):
+            UserMap.update(values={'gerrit_username': data['gerrit_username']},
+                           **query)
+        else:
+            super(UserMap, cls).save(**data)
+
+        return True
+
+    @classmethod
     def get_by_gerrit_username(cls, username):
+        chat_id = None
         try:
-            data = super(UserMap, cls).get(gerrit_username=username)
+            row = super(UserMap, cls).get(gerrit_username=username)
         except WritersException:
-            data = None
-        if data:
-            return data[1]
+            row = None
+        if row:
+            chat_id, user_name = row
+        return chat_id
+
+    @classmethod
+    def get_user_ids(cls):
+        rows = super(UserMap, cls).get_many()
+        for chat_id, user_name in rows:
+            yield chat_id

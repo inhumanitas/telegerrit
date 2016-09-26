@@ -16,9 +16,6 @@ class Option(object):
         self.title = title
         self.value = value or title
 
-    def __cmp__(self, other):
-        return self.value == other
-
 
 class Setting(object):
     """
@@ -67,7 +64,7 @@ option_disable = Option('Disable')
 
 
 def notify_comment_saver(message):
-    is_notified = 1 if message.text == option_enable else 0
+    is_notified = message.text == option_enable.value
     chat_id = message.chat.id
     return CommentsWriter.save(chat_id, is_notified)
 

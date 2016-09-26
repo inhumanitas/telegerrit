@@ -1,3 +1,4 @@
+import logging
 
 import telebot
 from telebot import types
@@ -6,6 +7,8 @@ from telegerrit import settings
 from telegerrit.telegram.setup import settings_list
 
 bot = telebot.TeleBot(settings.bot_father_token)
+
+logger = logging.getLogger(__name__)
 
 
 def next_step_wrapper(fn):
@@ -58,7 +61,10 @@ def setup_command(message):
 
 def send_message(user_id, message):
     msg = message or u'Wrong message format'
-    bot.send_message(user_id, msg)
+    try:
+        bot.send_message(user_id, msg)
+    except Exception as e:
+        logger.error(user_id + unicode(e))
 
 
 if __name__ == '__main__':
