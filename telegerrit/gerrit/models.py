@@ -1,10 +1,9 @@
 import logging
 import os
-
 import sqlite3
 
-
 from collections import OrderedDict
+
 from telegerrit import settings
 
 
@@ -23,6 +22,10 @@ class SettingsWriter(object):
     _conn = None
     table_name = None  # name of the table to be created
     columns = None
+
+    @classmethod
+    def from_row(cls, row):
+        return dict(zip(cls.columns, row))
 
     @classmethod
     def __prepared(cls):
@@ -82,27 +85,24 @@ class SettingsWriter(object):
         return cls.__write_entry(**data)
 
     @classmethod
-    def get(cls, **data):
+    def retrieve(cls, **data):
+        query = ' AND '.join(
+            [unicode(k) + '="' + unicode(v)+'"' for k, v in data.items()])
+        if query:
+            query_str = u"SELECT * FROM {table_name} WHERE {query}"
+        else:
+            query_str = u"SELECT * FROM {table_name} {query}"
+        sql = query_str.format(table_name=cls.table_name, query=query)
 
-        query = u' AND '.join(
-            [unicode(k) + u'="' + unicode(v)+u'"' for k, v in data.items()])
+        return cls.__exec_sql(sql)
 
-        sql = u"SELECT * FROM {table_name} WHERE {query}".format(
-            table_name=cls.table_name, query=query)
-
-        return cls.__exec_sql(sql).fetchone()
+    @classmethod
+    def get_one(cls, **data):
+        return cls.retrieve(**data).fetchone()
 
     @classmethod
     def get_many(cls, **data):
-
-        query = u' AND '.join(
-            [unicode(k) + u'="' + unicode(v) + u'"' for k, v in data.items()])
-        if query:
-            sql = u"SELECT * FROM {table_name} WHERE {query}".format(
-                table_name=cls.table_name, query=query)
-        else:
-            return cls.get_all()
-        return cls.__exec_sql(sql).fetchall()
+        return cls.retrieve(**data).fetchall()
 
     @classmethod
     def update(cls, values, **query):
@@ -120,6 +120,15 @@ class SettingsWriter(object):
         return cls.__exec_sql(sql).fetchall()
 
     @classmethod
+    def delete(cls, **params):
+        q = ' AND '.join(
+            [unicode(k)+'="'+unicode(v)+'"' for k, v in params.items()])
+
+        sql = "DELETE FROM {table_name} WHERE {query}".format(
+            table_name=cls.table_name, query=q)
+        return cls.__exec_sql(sql)
+
+    @classmethod
     def get_all(cls):
         sql = u"SELECT * FROM {table_name}".format(
                 table_name=cls.table_name)
@@ -130,17 +139,17 @@ class CommentsWriter(SettingsWriter):
     """Manager for setting for comment"""
 
     table_name = 'Comments'
+    # TODO unique by chat_id
     columns = OrderedDict({
         'chat_id': 'INTEGER',
         'is_notified': 'INTEGER',
     })
-    # TODO unique by chat_id
 
     @classmethod
     def save(cls, chat_id, is_notified):
         query = {'chat_id': chat_id}
 
-        if CommentsWriter.get(**query):
+        if CommentsWriter.get_one(**query):
             CommentsWriter.update(values={'is_notified': is_notified},
                                   **query)
         else:
@@ -150,7 +159,7 @@ class CommentsWriter(SettingsWriter):
 
     @classmethod
     def is_notified(cls, chat_id):
-        row = CommentsWriter.get(chat_id=chat_id)
+        row = CommentsWriter.get_one(chat_id=chat_id)
         is_notified, chat_id = row if row else ('False', 0)
         is_notified = is_notified == 'True'
         return is_notified
@@ -160,6 +169,7 @@ class UserMap(SettingsWriter):
     """Manager for setting map gerrit username to telegram user id"""
 
     table_name = 'UserMap'
+    # TODO uniq by all cols
     columns = OrderedDict({
         'chat_id': 'INTEGER',
         'gerrit_username': 'INTEGER',
@@ -171,7 +181,7 @@ class UserMap(SettingsWriter):
     def save(cls, **data):
         query = {'chat_id': data['chat_id']}
 
-        if UserMap.get(**query):
+        if UserMap.get_one(**query):
             UserMap.update(values={'gerrit_username': data['gerrit_username']},
                            **query)
         else:
@@ -183,7 +193,7 @@ class UserMap(SettingsWriter):
     def get_by_gerrit_username(cls, username):
         chat_id = None
         try:
-            row = super(UserMap, cls).get(gerrit_username=username)
+            row = super(UserMap, cls).get_one(gerrit_username=username)
         except WritersException:
             row = None
         if row:
@@ -195,3 +205,13 @@ class UserMap(SettingsWriter):
         rows = super(UserMap, cls).get_many()
         for chat_id, user_name in rows:
             yield chat_id, user_name
+
+    @classmethod
+    def set(cls, **data):
+        rows = cls.get_many(chat_id=data.get('chat_id'))
+        for row in rows:
+            param = cls.from_row(row)
+            param.pop('gerrit_username')
+            cls.delete(**param)
+
+        return cls.save(**data)
