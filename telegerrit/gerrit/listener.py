@@ -1,8 +1,10 @@
 import logging
 import sys
+from time import sleep
 
 from pygerrit.client import GerritClient
-from pygerrit.events import CommentAddedEvent
+from pygerrit.error import GerritError
+from pygerrit.events import CommentAddedEvent, PatchsetCreatedEvent
 
 from telegerrit.gerrit.models import UserMap, CommentsWriter
 from telegerrit.settings import ssh_config, gerrit_url_template
@@ -25,7 +27,15 @@ class GerritClientEventStream(GerritClient):
 
     def __enter__(self):
         # Needed to make event stream to be connected to server
-        self.client.gerrit_version()
+        not_connected = True
+        while not_connected:
+            try:
+                self.client.gerrit_version()
+                not_connected = False
+            except GerritError as e:
+                logger.error(e)
+                sleep(3)
+
         self.client.start_event_stream()
         return self.client
 
@@ -44,16 +54,35 @@ class CommentAddedEventHandler(EventHandler):
     def run(cls, event):
         # send message if subscribed
         if (event.author.name == u'Jenkins' and
-                event.comment == u'Patch Set 1: Verified+1'):
+                u'Verified+1' in event.comment):
             return
 
-        for chat_id in UserMap.get_user_ids():
+        for chat_id, username in UserMap.get_users():
+            if event.author.username == username:
+                continue
+
+            # TODO All various notification rules should be refactored
             if CommentsWriter.is_notified(chat_id=chat_id):
                 msg = u';\n'.join([
-                    event.comment,
+                    event.comment + u' by ' + event.author.name,
+                    event.change.owner.name+unicode(event.change),
+                    event.change.subject,
+                    gerrit_url_template.format(change_id=event.change.number),
+                ])
+                logger.info(msg)
+                send_message(chat_id, msg)
+
+
+class PatchsetCreatedEventEventHandler(CommentAddedEventHandler):
+    @classmethod
+    def run(cls, event):
+        # send message if subscribed
+        for chat_id in UserMap.get_users():
+            if CommentsWriter.is_notified(chat_id=chat_id):
+                msg = u';\n'.join([
+                    event.name + u' by ' + event.uploader.name,
                     event.change.owner.name+unicode(event.change),
                     gerrit_url_template.format(change_id=event.change.number),
-                    event.author.name
                 ])
                 logger.info(msg)
                 send_message(chat_id, msg)
@@ -61,6 +90,7 @@ class CommentAddedEventHandler(EventHandler):
 
 events = {
     CommentAddedEvent: CommentAddedEventHandler,
+    PatchsetCreatedEvent: PatchsetCreatedEventEventHandler,
 }
 
 

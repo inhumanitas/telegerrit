@@ -191,7 +191,7 @@ class UserMap(SettingsWriter):
         return chat_id
 
     @classmethod
-    def get_user_ids(cls):
+    def get_users(cls):
         rows = super(UserMap, cls).get_many()
         for chat_id, user_name in rows:
-            yield chat_id
+            yield chat_id, user_name
