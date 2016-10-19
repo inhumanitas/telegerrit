@@ -64,17 +64,24 @@ def ping(message):
 
 @bot.message_handler(commands=['st'])
 def sticked(message):
-    bot.send_message(message.chat.id, 'wait pls...')
-    bot.send_message(message.chat.id,
-                     stikked.create_paste(message.text.strip(u'/st')))
+    def create_sticked(message):
+        bot.send_message(message.chat.id, u'Погоди ...')
+        bot.send_message(message.chat.id,
+                         stikked.create_paste(message.text))
+
+    msg = bot.send_message(message.chat.id, u"Кидай текст")
+    bot.register_next_step_handler(msg, create_sticked)
 
 
 @bot.message_handler(commands=['st_raw'])
 def sticked_raw(message):
-    bot.send_message(message.chat.id, 'wait pls...')
-    bot.send_message(
-        message.chat.id,
-        stikked.create_paste(message.text.strip(u'/st_raw'), raw=True))
+    def create_sticked(message):
+        bot.send_message(message.chat.id, u'Погоди ...')
+        bot.send_message(message.chat.id,
+                         stikked.create_paste(message.text, raw=True))
+
+    msg = bot.send_message(message.chat.id, u"Кидай текст")
+    bot.register_next_step_handler(msg, create_sticked)
 
 
 @bot.message_handler()
