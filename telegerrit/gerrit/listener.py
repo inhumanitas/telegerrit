@@ -4,7 +4,8 @@ from time import sleep
 
 from pygerrit.client import GerritClient
 from pygerrit.error import GerritError
-from pygerrit.events import CommentAddedEvent, PatchsetCreatedEvent
+from pygerrit.events import (
+    CommentAddedEvent, PatchsetCreatedEvent, ChangeMergedEvent)
 
 from telegerrit.gerrit.models import UserMap, CommentsWriter
 from telegerrit.settings import ssh_config, gerrit_url_template
@@ -54,7 +55,8 @@ class CommentAddedEventHandler(EventHandler):
     def run(cls, event):
         # send message if subscribed
         if (event.author.name == u'Jenkins' and
-                u'Verified+1' in event.comment):
+                u'Verified+1' in event.comment or
+                u'Code-Review+2' in event.comment):
             return
 
         for chat_id, username in UserMap.get_users():
@@ -73,11 +75,11 @@ class CommentAddedEventHandler(EventHandler):
                 send_message(chat_id, msg)
 
 
-class PatchsetCreatedEventEventHandler(CommentAddedEventHandler):
+class PatchsetCreatedEventEventHandler(EventHandler):
     @classmethod
     def run(cls, event):
         # send message if subscribed
-        for chat_id in UserMap.get_users():
+        for chat_id, username in UserMap.get_users():
             if CommentsWriter.is_notified(chat_id=chat_id):
                 msg = u';\n'.join([
                     event.name + u' by ' + event.uploader.name,
@@ -88,9 +90,26 @@ class PatchsetCreatedEventEventHandler(CommentAddedEventHandler):
                 send_message(chat_id, msg)
 
 
+class ChangeMergedEventEventHandler(EventHandler):
+    @classmethod
+    def run(cls, event):
+        # send message if subscribed
+        for chat_id, username in UserMap.get_users():
+            if CommentsWriter.is_notified(chat_id=chat_id):
+                msg = u';\n'.join([
+                    event.name + u' by ' + event.submitter.name,
+                    event.change.owner.name+unicode(event.change),
+                    gerrit_url_template.format(change_id=event.change.number),
+                ])
+                logger.info(msg)
+                send_message(chat_id, msg)
+
+
+
 events = {
     CommentAddedEvent: CommentAddedEventHandler,
     PatchsetCreatedEvent: PatchsetCreatedEventEventHandler,
+    ChangeMergedEvent: ChangeMergedEventEventHandler,
 }
 
 

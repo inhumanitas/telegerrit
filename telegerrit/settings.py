@@ -18,7 +18,7 @@ gerrit_url_template = 'http://gerrit.tionix.loc/#/c/{change_id}/'
 
 stikked_api_url = 'http://stikked.tionix.loc/api'
 
-LOG_LEVEL = 'INFO'
+LOG_LEVEL = 'DEBUG'
 
 LOGGING = {
     'version': 1,

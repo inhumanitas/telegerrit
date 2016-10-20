@@ -1,5 +1,7 @@
 # coding: utf-8
 import logging
+import os
+from random import randint
 
 import telebot
 from telebot import types
@@ -8,9 +10,11 @@ from telegerrit import settings
 from telegerrit.stikked.api import stikked
 from telegerrit.telegram.setup import settings_list
 
-bot = telebot.TeleBot(settings.bot_father_token)
-
 logger = logging.getLogger(__name__)
+
+bot = telebot.TeleBot(settings.bot_father_token)
+brother_path = 'brother.txt'
+answers = []
 
 
 def next_step_wrapper(fn):
@@ -84,17 +88,43 @@ def sticked_raw(message):
     bot.register_next_step_handler(msg, create_sticked)
 
 
+if os.path.exists(brother_path):
+    with open(brother_path) as fh:
+        answers = fh.readlines()
+        answers = filter(bool, map(lambda s: s.strip(), answers))
+
+
 @bot.message_handler()
 def all_messages(message):
     BAD_WORDS = (
-        u'дурак', u'дура',
-        u'тупой',
-        u'дибил',
-        u'брат'
+        u'дура',
+        u'тупой', u'олень',
+        u'дибил', u'идиот',
+        u'брат', u'сестра'
     )
+    brother = [u'брат', u'сестра']
     yourself = u"сам "
-    if message.text in BAD_WORDS:
-        bot.send_message(message.chat.id, yourself+message.text.strip(u'/'))
+    message_text = message.text.lower()
+    if (message_text.find(u'спасиб') >= 0 or
+            message_text.find(u'спсб') >= 0 or message_text.find(u'спс') >= 0):
+        bot.send_message(message.chat.id, u'Незашта, брат')
+        return
+
+    for bad_word in BAD_WORDS:
+        if message_text.find(bad_word) >= 0:
+            if bad_word in brother:
+                message_text = message_text.encode('utf-8')
+                if message_text not in answers:
+                    with open(brother_path, 'w') as fh:
+                        answers.append(message_text)
+                        fh.write('\n'.join(answers))
+                        logger.debug('new word: '+message_text)
+                bot.send_message(
+                    message.chat.id,
+                    answers[randint(0, len(answers)-1)].capitalize())
+                break
+            else:
+                bot.send_message(message.chat.id, yourself+bad_word)
 
 
 def send_message(user_id, message):
@@ -106,5 +136,5 @@ def send_message(user_id, message):
 
 
 if __name__ == '__main__':
-    print 'Starting bot'
+    logger.info('Starting bot')
     bot.polling()
