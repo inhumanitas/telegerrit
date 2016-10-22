@@ -7,7 +7,7 @@ import telebot
 from telebot import types
 
 from telegerrit import settings
-from telegerrit.stikked.api import stikked
+from telegerrit.stikked.api import stikked, StikkedException
 from telegerrit.telegram.setup import settings_list
 
 logger = logging.getLogger(__name__)
@@ -70,8 +70,12 @@ def ping(message):
 def sticked(message):
     def create_sticked(message):
         bot.send_message(message.chat.id, u'Погоди ...')
-        bot.send_message(message.chat.id,
-                         stikked.create_paste(message.text))
+        try:
+            stikked_msg = stikked.create_paste(message.text)
+        except StikkedException as exc:
+            stikked_msg = exc.message
+
+        bot.send_message(message.chat.id, stikked_msg)
 
     msg = bot.send_message(message.chat.id, u"Кидай текст")
     bot.register_next_step_handler(msg, create_sticked)
@@ -79,13 +83,17 @@ def sticked(message):
 
 @bot.message_handler(commands=['st_raw'])
 def sticked_raw(message):
-    def create_sticked(message):
+    def create_raw_sticked(message):
         bot.send_message(message.chat.id, u'Погоди ...')
-        bot.send_message(message.chat.id,
-                         stikked.create_paste(message.text, raw=True))
+        try:
+            stikked_msg = stikked.create_paste(message.text, raw=True)
+        except StikkedException as exc:
+            stikked_msg = exc.message
+
+        bot.send_message(message.chat.id, stikked_msg)
 
     msg = bot.send_message(message.chat.id, u"Кидай текст")
-    bot.register_next_step_handler(msg, create_sticked)
+    bot.register_next_step_handler(msg, create_raw_sticked)
 
 
 if os.path.exists(brother_path):

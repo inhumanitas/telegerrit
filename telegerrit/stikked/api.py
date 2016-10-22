@@ -30,16 +30,18 @@ class Stikked(object):
             response = request(method=method, url=full_path, **kwargs)
         except Exception as e:
             logger.error(e)
+            raise StikkedException(e.message)
 
+        data = {}
         if parse:
-            data = {}
-            if response.status_code == HTTP_OK:
+            if response and response.status_code == HTTP_OK:
                 try:
                     data = json.loads(response.content)
                 except ValueError:
                     pass
-        else:
+        elif response:
             data = response.content
+
         return data
 
     @property
@@ -69,6 +71,7 @@ class Stikked(object):
 
         url = self.make_req(
             self._create_url, method='POST', parse=False, data=data)
+
         if raw:
             url = url.replace('/view/', '/view/raw/')
         return url
